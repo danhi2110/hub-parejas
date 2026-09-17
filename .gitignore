@@ -1,0 +1,21 @@
+# Dependencias y logs
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de entorno y credenciales locales
+.env
+.env.local
+.env.*.local
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs y editores
+.vscode/
+.idea/
+*.swp
+*.swo

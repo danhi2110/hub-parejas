@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="romantic">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hub Interactivo de Parejas ❤️</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💖</text></svg>">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- CABECERA PRINCIPAL -->
+    <header class="app-header">
+      <div class="logo-group">
+        <span class="logo-heart">💖</span>
+        <span class="logo-title">Nuestro Rincón</span>
+      </div>
+
+      <div class="header-controls">
+        <select id="select-theme" class="theme-select" title="Cambiar Tema Visual">
+          <option value="romantic">🌸 Romántico</option>
+          <option value="dark">🌙 Oscuro</option>
+          <option value="warm">🧸 Tierno</option>
+        </select>
+
+        <div id="header-user-section" class="hidden" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+          <div id="header-couple-names" class="badge-partner">
+            <span>Tú</span> & <span>Tu Pareja</span>
+          </div>
+          <button id="btn-logout" class="btn btn-secondary btn-sm" title="Cerrar sesión">Salir</button>
+        </div>
+      </div>
+    </header>
+
+
+    <!-- ======================================================================
+         VISTA 1: AUTENTICACIÓN (LOGIN / REGISTRO)
+         ====================================================================== -->
+    <section id="view-auth" class="fade-in">
+      <div class="card" style="max-width: 460px; margin: 2rem auto;">
+        <h1 id="auth-title" class="card-title" style="text-align: center;">Bienvenido a Nuestro Rincón</h1>
+        <p id="auth-subtitle" class="card-subtitle" style="text-align: center;">Tu espacio privado e interactivo diseñado exclusivamente para dos.</p>
+
+        <form id="form-auth">
+          <div class="form-group">
+            <label class="form-label" for="auth-username">Nombre de Usuario</label>
+            <input type="text" id="auth-username" class="form-input" placeholder="ej. diego23" required autocomplete="username" pattern="[a-zA-Z0-9_-]{3,20}">
+          </div>
+
+          <div id="group-alias" class="form-group">
+            <label class="form-label" for="auth-alias">¿Cómo te llama tu pareja?</label>
+            <input type="text" id="auth-alias" class="form-input" placeholder="ej. Mi Amor, Cariño, Diego" maxlength="30">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="auth-password">Contraseña</label>
+            <input type="password" id="auth-password" class="form-input" placeholder="Mínimo 6 caracteres" required autocomplete="current-password" minlength="6">
+          </div>
+
+          <button type="submit" id="btn-auth-submit" class="btn btn-primary btn-block">
+            Registrarme y Comenzar
+          </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.25rem; font-size: 0.88rem; color: var(--text-muted);">
+          <span id="auth-toggle-msg">¿Ya tienes una cuenta?</span>
+          <a href="#" id="auth-toggle-link" style="color: var(--primary); font-weight: 600; text-decoration: none;">Inicia sesión aquí</a>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ======================================================================
+         VISTA 2: ONBOARDING (CÓDIGO DE 6 CARACTERES)
+         ====================================================================== -->
+    <section id="view-onboarding" class="fade-in hidden">
+      <div class="card" style="max-width: 520px; margin: 2rem auto;">
+        
+        <div id="onboarding-choices">
+          <h2 class="card-title" style="text-align: center;">Conéctate con tu Pareja</h2>
+          <p class="card-subtitle" style="text-align: center;">Este espacio es un santuario privado para ustedes dos.</p>
+
+          <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <button id="btn-show-create-space" class="btn btn-primary btn-block">
+              ✨ Crear Nuestro Espacio de Pareja
+            </button>
+            <div style="text-align: center; font-size: 0.82rem; color: var(--text-muted);">— O SI TU PAREJA YA CREÓ EL ESPACIO —</div>
+            <button id="btn-show-join-space" class="btn btn-secondary btn-block">
+              🔑 Tengo un Código de Invitación
+            </button>
+          </div>
+        </div>
+
+        <div id="onboarding-create-form" class="hidden">
+          <h2 class="card-title">Crear Nuestro Espacio</h2>
+          <p class="card-subtitle">Define cuándo comenzó su historia para activar su contador.</p>
+
+          <form id="form-create-space">
+            <div class="form-group">
+              <label class="form-label" for="create-anniversary-date">¿Desde cuándo están juntos?</label>
+              <input type="datetime-local" id="create-anniversary-date" class="form-input" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Generar Código de 6 Caracteres</button>
+            <button type="button" id="btn-cancel-create" class="btn btn-secondary btn-block" style="margin-top: 0.5rem;">Volver</button>
+          </form>
+        </div>
+
+        <div id="onboarding-waiting" class="hidden">
+          <h2 class="card-title" style="text-align: center;">¡Espacio Creado! 🎉</h2>
+          <p class="card-subtitle" style="text-align: center;">Comparte este código exclusivo con tu pareja para vincularse:</p>
+
+          <div style="background: var(--primary-subtle); border: 2px dashed var(--primary); border-radius: 16px; padding: 1.5rem; text-align: center; margin: 1rem 0;">
+            <div id="display-invite-code" style="font-family: monospace; font-size: 2.8rem; font-weight: 800; letter-spacing: 6px; color: var(--primary);">------</div>
+            <button id="btn-copy-code" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">📋 Copiar Código</button>
+            <div style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted);">
+              ⏳ Esperando a que tu pareja ingrese el código...
+            </div>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">Esta pantalla cambiará automáticamente en cuanto se una.</p>
+        </div>
+
+        <div id="onboarding-join-form" class="hidden">
+          <h2 class="card-title">Ingresa el Código</h2>
+          <p class="card-subtitle">Escribe el código de 6 caracteres que te dio tu pareja.</p>
+
+          <form id="form-join-space">
+            <div class="form-group">
+              <label class="form-label" for="join-code">Código de Invitación</label>
+              <input type="text" id="join-code" class="form-input" placeholder="ej. K7X9Q2" maxlength="6" style="text-transform: uppercase; letter-spacing: 4px; font-weight: 800; text-align: center; font-size: 1.3rem;" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Vincularnos Ahora</button>
+            <button type="button" id="btn-cancel-join" class="btn btn-secondary btn-block" style="margin-top: 0.5rem;">Volver</button>
+          </form>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- ======================================================================
+         VISTA 3: HUB PRINCIPAL
+         ====================================================================== -->
+    <section id="view-dashboard" class="fade-in hidden">
+      
+      <!-- BARRA DE NAVEGACIÓN -->
+      <nav class="nav-tabs">
+        <button class="tab-btn active" data-tab="tab-home">🏠 Inicio</button>
+        <button class="tab-btn" data-tab="tab-notes">🖍️ Pizarrón & Música</button>
+        <button class="tab-btn" data-tab="tab-arcade">🕹️ Arcade</button>
+        <button class="tab-btn" data-tab="tab-bucket">✨ Bucket List</button>
+        <button class="tab-btn" data-tab="tab-memories">📸 Recuerdos</button>
+        <button class="tab-btn" data-tab="tab-story">📖 Nuestra Historia</button>
+      </nav>
+
+      <!-- 1. PESTAÑA: INICIO (DASHBOARD) -->
+      <div id="tab-home" class="tab-pane fade-in">
+        <div class="timer-hero">
+          <h2 class="timer-title">Llevamos Juntos</h2>
+          <p class="timer-subtitle" id="timer-anniversary-label">Calculando tiempo de amor...</p>
+
+          <div class="timer-grid">
+            <div class="timer-card"><span class="timer-num" id="t-years">0</span><span class="timer-label">Años</span></div>
+            <div class="timer-card"><span class="timer-num" id="t-months">0</span><span class="timer-label">Meses</span></div>
+            <div class="timer-card"><span class="timer-num" id="t-days">0</span><span class="timer-label">Días</span></div>
+            <div class="timer-card"><span class="timer-num" id="t-hours">00</span><span class="timer-label">Horas</span></div>
+            <div class="timer-card"><span class="timer-num" id="t-minutes">00</span><span class="timer-label">Min</span></div>
+            <div class="timer-card"><span class="timer-num" id="t-seconds">00</span><span class="timer-label">Seg</span></div>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <button id="btn-open-anniversary-modal" class="btn btn-secondary btn-sm">🗓️ Cambiar fecha</button>
+          </div>
+        </div>
+
+        <!-- WIDGET: ESTADO DE ÁNIMO DIARIO -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 class="card-title" style="font-size: 1.15rem;">💭 ¿Cómo nos sentimos hoy?</h3>
+            <button id="btn-open-mood-modal" class="btn btn-secondary btn-sm">+ Actualizar mi ánimo</button>
+          </div>
+
+          <div class="mood-container">
+            <div class="mood-card">
+              <div class="mood-avatar" id="my-mood-emoji">😊</div>
+              <div class="mood-info">
+                <div class="mood-user" id="my-mood-user">Tú</div>
+                <div class="mood-note" id="my-mood-note">"Sin nota hoy"</div>
+              </div>
+            </div>
+
+            <div class="mood-card">
+              <div class="mood-avatar" id="partner-mood-emoji">😴</div>
+              <div class="mood-info">
+                <div class="mood-user" id="partner-mood-user">Tu Pareja</div>
+                <div class="mood-note" id="partner-mood-note">"Aún no ha compartido su ánimo hoy"</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- 2. PESTAÑA: PIZARRÓN DE NOTAS Y CANCIONES -->
+      <div id="tab-notes" class="tab-pane fade-in hidden">
+        <div class="pizarron-board">
+          <div class="pizarron-header">
+            <div class="chalk-title">🖍️ Pizarrón de la Pareja</div>
+            
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btn-open-note-modal" class="btn btn-primary btn-sm">+ Dejar Nota de Tiza</button>
+              <button id="btn-open-music-modal" class="btn btn-secondary btn-sm" style="background: rgba(255,255,255,0.2); color: #fff; border-color: rgba(255,255,255,0.4);">
+                🎵 Dedicar Canción
+              </button>
+            </div>
+          </div>
+
+          <!-- Subpestañas del Pizarrón -->
+          <div class="pizarron-tabs">
+            <button id="btn-pizarron-tab-notes" class="pizarron-tab-btn active">📝 Muro de Notas</button>
+            <button id="btn-pizarron-tab-music" class="pizarron-tab-btn">🎶 Canciones & Playlist</button>
+          </div>
+
+          <!-- Vista Notas del Pizarrón -->
+          <div id="pizarron-notes-view">
+            <div id="notes-wall-container" class="notes-wall">
+              <p style="color: #cbd5e1;">Cargando notas...</p>
+            </div>
+          </div>
+
+          <!-- Vista Canciones del Pizarrón -->
+          <div id="pizarron-music-view" class="hidden">
+            <div id="music-grid-container" class="music-grid">
+              <p style="color: #cbd5e1;">No hay canciones dedicadas todavía. ¡Dedica la primera con un link de YouTube o Spotify!</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+
+      <!-- 3. PESTAÑA: ARCADE (MINIJUEGOS & CONTADOR GLOBAL) -->
+      <div id="tab-arcade" class="tab-pane fade-in hidden">
+        
+        <!-- MARCADOR GLOBAL DE RONDAS -->
+        <div class="arcade-global-scoreboard">
+          <div class="scoreboard-title">
+            🏆 Marcador Global de Rondas
+          </div>
+          <div class="score-pills">
+            <div class="score-pill-item">❤️ <span id="global-name-p1">Tú</span>: <span id="global-score-p1" style="color: var(--primary);">0</span></div>
+            <div class="score-pill-item">⭐ <span id="global-name-p2">Tu Pareja</span>: <span id="global-score-p2" style="color: var(--accent);">0</span></div>
+          </div>
+          <button id="btn-reset-global-score" class="btn btn-secondary btn-sm">Reiniciar Marcador</button>
+        </div>
+
+        <!-- SELECTOR DE MINIJUEGOS -->
+        <div class="arcade-menu-chips">
+          <button class="arcade-chip active" data-game="ttt">❌⭕ 3 en Raya (3x3 a 8x8)</button>
+          <button class="arcade-chip" data-game="checkers">🔴⚪ Damas</button>
+          <button class="arcade-chip" data-game="chess">♟️ Ajedrez</button>
+          <button class="arcade-chip" data-game="trivia">🧠 Trivia de Pareja</button>
+          <button class="arcade-chip" data-game="vor">💭 Verdad o Reto</button>
+          <button class="arcade-chip" data-game="tnt">⚖️ Esto o Aquello</button>
+          <button class="arcade-chip" data-game="coop">🤝 Misión Cooperativa</button>
+        </div>
+
+        <!-- JUEGO 1: 3 EN RAYA (AMPLIABLE DE 3x3 HASTA 8x8) -->
+        <div id="game-ttt" class="game-card">
+          <h3 class="card-title">❌⭕ 3 en Raya Romántico</h3>
+          <p class="card-subtitle">Corazones (❤️) contra Estrellas (⭐)</p>
+
+          <!-- MINI JUEGO: PIEDRA, PAPEL O TIJERA PARA DECIDIR QUIÉN EMPIEZA -->
+          <div class="rps-box">
+            <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 0.3rem;">✊✋✌️ ¿Quién empieza? Juega Piedra, Papel o Tijera:</div>
+            <div class="rps-btn-group">
+              <button class="rps-hand-btn" data-choice="piedra">✊</button>
+              <button class="rps-hand-btn" data-choice="papel">✋</button>
+              <button class="rps-hand-btn" data-choice="tijera">✌️</button>
+            </div>
+            <div id="rps-result" style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-top: 0.4rem;">Haz clic en tu jugada para sortear el primer turno</div>
+          </div>
+
+          <!-- Selector de tamaño (3x3 a 8x8) -->
+          <div class="ttt-size-selector">
+            <label class="form-label" style="margin-bottom: 0; font-size: 0.9rem;">Tamaño del tablero:</label>
+            <select id="select-ttt-size" class="theme-select">
+              <option value="3" selected>3 x 3 (Clásico - Conecta 3)</option>
+              <option value="4">4 x 4 (Conecta 4)</option>
+              <option value="5">5 x 5 (Conecta 4)</option>
+              <option value="6">6 x 6 (Conecta 5)</option>
+              <option value="7">7 x 7 (Conecta 5)</option>
+              <option value="8">8 x 8 (Conecta 5)</option>
+            </select>
+          </div>
+
+          <div id="ttt-turn-label" style="font-weight: 800; color: var(--primary); font-size: 1.1rem; margin-bottom: 0.5rem;">
+            Turno de: ❤️ Tú
+          </div>
+
+          <div id="ttt-dynamic-container" class="ttt-board-dynamic"></div>
+
+          <button id="btn-ttt-reset" class="btn btn-secondary btn-sm">Reiniciar Tablero</button>
+        </div>
+
+        <!-- JUEGO 2: DAMAS (CHECKERS) -->
+        <div id="game-checkers" class="game-card hidden">
+          <h3 class="card-title">🔴⚪ Damas de Pareja</h3>
+          <p class="card-subtitle">❤️ Corazones vs ⭐ Estrellas (Salva tus piezas y corona damas con 👑)</p>
+          <div id="checkers-turn-label" style="font-weight: 800; color: var(--primary); margin-bottom: 0.5rem;">Turno de: ❤️ Corazones</div>
+          
+          <div id="checkers-board-container" class="checkers-board"></div>
+          
+          <button id="btn-checkers-reset" class="btn btn-secondary btn-sm">Reiniciar Partida de Damas</button>
+        </div>
+
+        <!-- JUEGO 3: AJEDREZ (CHESS) -->
+        <div id="game-chess" class="game-card hidden">
+          <h3 class="card-title">♟️ Ajedrez para Dos</h3>
+          <p class="card-subtitle">Blancas (♔) vs Negras (♚). Toca una pieza para ver sus movimientos válidos.</p>
+          <div id="chess-turn-label" style="font-weight: 800; color: var(--primary); margin-bottom: 0.5rem;">Turno de: ⚪ Blancas</div>
+
+          <div id="chess-board-container" class="chess-board"></div>
+
+          <button id="btn-chess-reset" class="btn btn-secondary btn-sm">Reiniciar Tablero de Ajedrez</button>
+        </div>
+
+        <!-- JUEGO 4: TRIVIA DE PAREJA PERSONALIZADA (5 a 20 preguntas) -->
+        <div id="game-trivia" class="game-card hidden">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 0;">🧠 Trivia de Nuestra Historia</h3>
+              <p class="card-subtitle" style="margin-bottom: 0;">¡El que tenga más aciertos gana la ronda!</p>
+            </div>
+            <button id="btn-open-add-trivia-modal" class="btn btn-primary btn-sm">+ Agregar Pregunta</button>
+          </div>
+
+          <!-- Configuración de Partida de Trivia -->
+          <div id="trivia-setup-box" style="background: var(--primary-subtle); border-radius: 14px; padding: 1.5rem; max-width: 420px; margin: 0 auto;">
+            <div class="form-group">
+              <label class="form-label">¿Cuántas preguntas jugar?</label>
+              <select id="select-trivia-count" class="form-input">
+                <option value="5" selected>5 Preguntas</option>
+                <option value="10">10 Preguntas</option>
+                <option value="15">15 Preguntas</option>
+                <option value="20">20 Preguntas</option>
+              </select>
+            </div>
+            <button id="btn-start-trivia" class="btn btn-primary btn-block">🚀 Iniciar Ronda de Trivia</button>
+          </div>
+
+          <!-- Pantalla de Juego de Trivia -->
+          <div id="trivia-game-box" class="hidden">
+            <div style="font-weight: 700; color: var(--text-muted); font-size: 0.9rem;" id="trivia-progress-label">Pregunta 1 de 5</div>
+            <h4 id="trivia-question-text" style="font-size: 1.25rem; font-weight: 800; margin: 1rem 0; min-height: 2.8rem;">---</h4>
+            
+            <div id="trivia-options-container" class="trivia-options-grid"></div>
+
+            <div id="trivia-feedback" style="font-weight: 800; margin-top: 0.75rem; min-height: 1.5rem;"></div>
+            <button id="btn-next-trivia-q" class="btn btn-primary btn-sm hidden" style="margin-top: 0.75rem;">Siguiente Pregunta ➡️</button>
+          </div>
+
+          <!-- Pantalla Final de Trivia -->
+          <div id="trivia-result-box" class="hidden" style="background: var(--primary-light); border-radius: 16px; padding: 2rem; max-width: 420px; margin: 0 auto;">
+            <h4 style="font-size: 1.5rem; font-weight: 800; color: var(--primary);">🎉 ¡Trivia Completada!</h4>
+            <div id="trivia-final-score" style="font-size: 1.1rem; font-weight: 700; margin: 1rem 0;">Aciertos: 0 / 5</div>
+            <button id="btn-restart-trivia-menu" class="btn btn-primary">Jugar Otra Trivia</button>
+          </div>
+        </div>
+
+        <!-- JUEGO 5: VERDAD O RETO PERSONALIZADO -->
+        <div id="game-vor" class="game-card hidden">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 0;">💭 Verdad o Reto para Dos</h3>
+              <p class="card-subtitle" style="margin-bottom: 0;">Preguntas íntimas, divertidas y retos</p>
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button id="btn-open-vor-add" class="btn btn-primary btn-sm">+ Agregar Reto/Verdad</button>
+              <button id="btn-clear-custom-vor" class="btn btn-secondary btn-sm" title="Limpiar lo que agregaron">🧹 Limpiar</button>
+            </div>
+          </div>
+
+          <div class="vor-categories">
+            <button class="category-chip active" data-vor-cat="all">Todas</button>
+            <button class="category-chip" data-vor-cat="romantic">❤️ Románticas</button>
+            <button class="category-chip" data-vor-cat="fun">😂 Divertidas</button>
+            <button class="category-chip" data-vor-cat="deep">🌌 Profundas</button>
+          </div>
+
+          <div class="vor-card">
+            <div id="vor-card-badge" class="vor-type-badge">❤️ VERDAD</div>
+            <div id="vor-card-text" class="vor-question">---</div>
+          </div>
+
+          <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+            <button id="btn-vor-next" class="btn btn-primary">🃏 Siguiente Carta</button>
+            <button id="btn-vor-truth" class="btn btn-secondary btn-sm">Sólo Verdad</button>
+            <button id="btn-vor-dare" class="btn btn-secondary btn-sm">Sólo Reto</button>
+          </div>
+        </div>
+
+        <!-- JUEGO 6: ESTO O AQUELLO PERSONALIZADO -->
+        <div id="game-tnt" class="game-card hidden">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 0;">⚖️ Esto o Aquello</h3>
+              <p class="card-subtitle" style="margin-bottom: 0;">Elijan entre dos opciones y descubran sus coincidencias</p>
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button id="btn-open-tnt-add" class="btn btn-primary btn-sm">+ Agregar Dilema</button>
+              <button id="btn-clear-custom-tnt" class="btn btn-secondary btn-sm" title="Limpiar dilemas agregados">🧹 Limpiar</button>
+            </div>
+          </div>
+
+          <div class="this-that-grid">
+            <button id="btn-opt-a" class="this-that-btn">
+              <span id="label-opt-a">Opción A</span>
+            </button>
+            <button id="btn-opt-b" class="this-that-btn">
+              <span id="label-opt-b">Opción B</span>
+            </button>
+          </div>
+
+          <div id="tnt-feedback" style="font-weight: 700; color: var(--primary); margin: 1rem 0; min-height: 1.5rem;"></div>
+          <button id="btn-tnt-next" class="btn btn-primary btn-sm">Siguiente Dilema ➡️</button>
+        </div>
+
+        <!-- JUEGO 7: MINIJUEGO COOPERATIVO (MISIÓN CORAZÓN CON D-PAD EN PANTALLA) -->
+        <div id="game-coop" class="game-card hidden">
+          <h3 class="card-title">🤝 Misión Corazón (Cooperativo)</h3>
+          <p class="card-subtitle">¡Muevan a su personaje con las flechas o los botones en pantalla para atrapar juntos todos los corazones flotantes antes de que acabe el tiempo!</p>
+
+          <div style="display: flex; justify-content: center; gap: 2rem; font-weight: 800; font-size: 1.1rem; margin-bottom: 0.75rem;">
+            <div>Puntaje de Equipo: <span id="coop-score" style="color: var(--primary);">0</span></div>
+            <div>Tiempo: <span id="coop-timer" style="color: #f59e0b;">30s</span></div>
+          </div>
+
+          <div class="coop-canvas-container">
+            <canvas id="coopCanvas" width="420" height="260"></canvas>
+            
+            <!-- CONTROLES D-PAD TÁCTILES EN PANTALLA -->
+            <div class="dpad-container">
+              <button class="dpad-btn dpad-up" id="btn-dpad-up">⬆️</button>
+              <button class="dpad-btn dpad-left" id="btn-dpad-left">⬅️</button>
+              <div class="dpad-btn dpad-center">💖</div>
+              <button class="dpad-btn dpad-right" id="btn-dpad-right">➡️</button>
+              <button class="dpad-btn dpad-down" id="btn-dpad-down">⬇️</button>
+            </div>
+          </div>
+
+          <button id="btn-start-coop" class="btn btn-primary btn-sm" style="margin-top: 1rem;">Iniciar Partida Cooperativa</button>
+        </div>
+
+      </div>
+
+
+      <!-- 4. PESTAÑA: BUCKET LIST -->
+      <div id="tab-bucket" class="tab-pane fade-in hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <div>
+            <h2 class="card-title">✨ Cosas que Queremos Hacer</h2>
+            <p class="card-subtitle" style="margin-bottom: 0;">Nuestra lista de sueños, viajes y metas compartidas</p>
+          </div>
+          <button id="btn-open-bucket-modal" class="btn btn-primary btn-sm">+ Agregar Sueño</button>
+        </div>
+
+        <div class="bucket-categories">
+          <button class="category-chip active" data-bcat="all">Todas</button>
+          <button class="category-chip" data-bcat="viajes">✈️ Viajes</button>
+          <button class="category-chip" data-bcat="citas">🍽️ Citas</button>
+          <button class="category-chip" data-bcat="peliculas">🎬 Películas</button>
+          <button class="category-chip" data-bcat="metas">🎯 Metas</button>
+          <button class="category-chip" data-bcat="random">😂 Random</button>
+        </div>
+
+        <div id="bucket-items-container" class="bucket-list">
+          <p style="color: var(--text-muted);">Cargando lista de sueños...</p>
+        </div>
+      </div>
+
+
+      <!-- 5. PESTAÑA: RECUERDOS (CON GOOGLE DRIVE) -->
+      <div id="tab-memories" class="tab-pane fade-in hidden">
+        
+        <!-- BANNER DE GOOGLE DRIVE -->
+        <div class="drive-banner">
+          <div>
+            <div style="font-weight: 800; font-size: 1.05rem; color: #0369a1;">📁 Carpeta de Fotos en Google Drive</div>
+            <div style="font-size: 0.85rem; color: #0c4a6e;">Tus fotos y videos de pareja en su carpeta compartida.</div>
+          </div>
+          <a href="https://drive.google.com/drive/folders/1OOChAmTOSByJVpOyXMofBQyCzsfN7A4w?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="text-decoration: none;">
+            📂 Abrir Carpeta de Drive ↗
+          </a>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+          <div>
+            <h2 class="card-title">📸 Álbum de Recuerdos</h2>
+            <p class="card-subtitle" style="margin-bottom: 0;">Momentos inolvidables (admite fotos normales y enlaces directos de Drive)</p>
+          </div>
+          <button id="btn-open-memory-modal" class="btn btn-primary btn-sm">+ Guardar Recuerdo / Foto</button>
+        </div>
+
+        <div id="memories-feed-container" style="display: flex; flex-direction: column; gap: 1rem;">
+          <p style="color: var(--text-muted);">Cargando recuerdos...</p>
+        </div>
+      </div>
+
+
+      <!-- 6. PESTAÑA: NUESTRA HISTORIA -->
+      <div id="tab-story" class="tab-pane fade-in hidden">
+        <div class="card" style="text-align: center;">
+          <h2 class="card-title" style="font-size: 1.8rem; margin-bottom: 0.5rem;">📖 Nuestra Historia Digital</h2>
+          <p class="card-subtitle">Pequeñas cosas que fueron formando nuestra gran aventura juntos.</p>
+
+          <div class="story-stats-grid">
+            <div class="story-stat-card">
+              <div class="story-stat-num" id="stat-days">0</div>
+              <div class="story-stat-label">Días Juntos</div>
+            </div>
+            <div class="story-stat-card">
+              <div class="story-stat-num" id="stat-notes">0</div>
+              <div class="story-stat-label">Notas en Pizarrón</div>
+            </div>
+            <div class="story-stat-card">
+              <div class="story-stat-num" id="stat-memories">0</div>
+              <div class="story-stat-label">Recuerdos / Fotos</div>
+            </div>
+            <div class="story-stat-card">
+              <div class="story-stat-num" id="stat-bucket">0</div>
+              <div class="story-stat-label">Metas Cumplidas</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <!-- ======================================================================
+       MODALES DIALOG
+       ====================================================================== -->
+  
+  <!-- Modal: Crear Nota -->
+  <div id="modal-note" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-note">&times;</button>
+      <h3 class="card-title">Dejar una Nota de Tiza</h3>
+      
+      <form id="form-create-note" style="margin-top: 1rem;">
+        <div class="form-group">
+          <label class="form-label" for="note-content">Mensaje</label>
+          <textarea id="note-content" class="form-input" rows="4" placeholder="Escribe algo lindo para tu pareja..." maxlength="1000" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Color de la nota</label>
+          <div class="color-picker-group">
+            <div class="color-option selected" data-color="#fef3c7" style="background: #fef3c7;"></div>
+            <div class="color-option" data-color="#ffe4e6" style="background: #ffe4e6;"></div>
+            <div class="color-option" data-color="#e0f2fe" style="background: #e0f2fe;"></div>
+            <div class="color-option" data-color="#dcfce7" style="background: #dcfce7;"></div>
+            <div class="color-option" data-color="#f3e8ff" style="background: #f3e8ff;"></div>
+          </div>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+          <input type="checkbox" id="note-pinned" style="cursor: pointer;">
+          <label for="note-pinned" style="font-size: 0.88rem; cursor: pointer;">📌 Fijar esta nota en el pizarrón</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Pegar en el Pizarrón</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Dedicar Canción (URL de YouTube / Spotify) -->
+  <div id="modal-music" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-music">&times;</button>
+      <h3 class="card-title">Dedicar una Canción 🎵</h3>
+      <p class="card-subtitle">Pega el link de YouTube o Spotify y aparecerá en el pizarrón para escucharla.</p>
+
+      <form id="form-create-music">
+        <div class="form-group">
+          <label class="form-label" for="music-title">Título de la Canción y Artista</label>
+          <input type="text" id="music-title" class="form-input" placeholder="ej. Perfect - Ed Sheeran" maxlength="100" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="music-url">Enlace (YouTube o Spotify)</label>
+          <input type="url" id="music-url" class="form-input" placeholder="https://www.youtube.com/watch?v=... o https://open.spotify.com/track/..." required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="music-dedication">Dedicatoria especial</label>
+          <textarea id="music-dedication" class="form-input" rows="2" placeholder="Esta canción me recuerda a ti porque..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Incrustar en el Pizarrón</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Guardar Recuerdo con Soporte Google Drive -->
+  <div id="modal-memory" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-memory">&times;</button>
+      <h3 class="card-title">Guardar un Recuerdo 📸</h3>
+      <p class="card-subtitle">Puedes pegar un enlace directo de foto o un enlace de compartir de Google Drive.</p>
+      
+      <form id="form-create-memory">
+        <div class="form-group">
+          <label class="form-label" for="memory-title">Título del Recuerdo</label>
+          <input type="text" id="memory-title" class="form-input" placeholder="ej. Nuestro viaje a las montañas" maxlength="100" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="memory-date">Fecha del Momento</label>
+          <input type="date" id="memory-date" class="form-input" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="memory-image-url">Enlace de Imagen o Google Drive (opcional)</label>
+          <input type="url" id="memory-image-url" class="form-input" placeholder="https://drive.google.com/file/d/... o URL directa de foto">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+            💡 Tip: Si pegas un link de Google Drive, asegúrate de que el archivo tenga permiso "Cualquiera con el enlace puede ver".
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="memory-desc">Descripción o anécdota</label>
+          <textarea id="memory-desc" class="form-input" rows="3" placeholder="¿Qué recuerdas de este día especial?..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Guardar en el Álbum</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Agregar Pregunta de Trivia -->
+  <div id="modal-trivia-add" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-trivia-add">&times;</button>
+      <h3 class="card-title">Nueva Pregunta de Trivia 🧠</h3>
+      
+      <form id="form-create-trivia">
+        <div class="form-group">
+          <label class="form-label" for="tq-question">Pregunta</label>
+          <input type="text" id="tq-question" class="form-input" placeholder="ej. ¿Cuál es mi comida favorita?" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Opción 1 (Marca si es la correcta):</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="radio" name="tq-correct" value="0" checked>
+            <input type="text" id="tq-opt-0" class="form-input" placeholder="Opción A" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Opción 2:</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="radio" name="tq-correct" value="1">
+            <input type="text" id="tq-opt-1" class="form-input" placeholder="Opción B" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Opción 3:</label>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="radio" name="tq-correct" value="2">
+            <input type="text" id="tq-opt-2" class="form-input" placeholder="Opción C" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Guardar Pregunta de Trivia</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Agregar Verdad o Reto Custom -->
+  <div id="modal-vor-add" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-vor-add">&times;</button>
+      <h3 class="card-title">Agregar Verdad o Reto 💭</h3>
+      
+      <form id="form-create-vor">
+        <div class="form-group">
+          <label class="form-label" for="vor-add-type">Tipo</label>
+          <select id="vor-add-type" class="form-input">
+            <option value="VERDAD">💭 Verdad</option>
+            <option value="RETO">🔥 Reto</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="vor-add-text">Escribe la pregunta o el reto</label>
+          <textarea id="vor-add-text" class="form-input" rows="3" placeholder="ej. ¿Cuál es el recuerdo más bonito que tienes de los dos?" required></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Agregar a la Baraja</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Agregar Dilema de Esto o Aquello -->
+  <div id="modal-tnt-add" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-tnt-add">&times;</button>
+      <h3 class="card-title">Nuevo Dilema: Esto o Aquello ⚖️</h3>
+      
+      <form id="form-create-tnt">
+        <div class="form-group">
+          <label class="form-label" for="tnt-add-a">Opción A</label>
+          <input type="text" id="tnt-add-a" class="form-input" placeholder="ej. Ver el atardecer en la playa" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="tnt-add-b">Opción B</label>
+          <input type="text" id="tnt-add-b" class="form-input" placeholder="ej. Ver las estrellas en el campo" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Agregar Dilema</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Estado de Ánimo -->
+  <div id="modal-mood" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-mood">&times;</button>
+      <h3 class="card-title">¿Cómo te sientes hoy?</h3>
+      <form id="form-update-mood">
+        <div class="mood-picker-grid">
+          <button type="button" class="mood-option-btn selected" data-emoji="😊">😊<span>Feliz</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="🥰">🥰<span>Enamorado</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="😌">😌<span>Tranquilo</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="😴">😴<span>Cansado</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="😔">😔<span>Triste</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="😡">😡<span>Molesto</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="🤩">🤩<span>Emocionado</span></button>
+          <button type="button" class="mood-option-btn" data-emoji="🤒">🤒<span>Malito</span></button>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="mood-note-input">Nota corta (opcional)</label>
+          <input type="text" id="mood-note-input" class="form-input" placeholder="ej. Pensando en ti hoy 💕" maxlength="100">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Guardar mi Estado</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Agregar Bucket List -->
+  <div id="modal-bucket" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-bucket">&times;</button>
+      <h3 class="card-title">Nuevo Sueño o Meta</h3>
+      <form id="form-create-bucket">
+        <div class="form-group">
+          <label class="form-label" for="bucket-title">¿Qué les gustaría hacer?</label>
+          <input type="text" id="bucket-title" class="form-input" placeholder="ej. Viajar juntos a París" maxlength="120" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="bucket-category">Categoría</label>
+          <select id="bucket-category" class="form-input">
+            <option value="viajes">✈️ Viajes</option>
+            <option value="citas">🍽️ Citas & Comida</option>
+            <option value="peliculas">🎬 Películas & Series</option>
+            <option value="metas">🎯 Metas de vida</option>
+            <option value="random">😂 Cosas Random</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Agregar a la Lista</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Cambiar Fecha Aniversario -->
+  <div id="modal-anniversary" class="modal-backdrop hidden">
+    <div class="modal-content">
+      <button class="modal-close" data-close="modal-anniversary">&times;</button>
+      <h3 class="card-title">Editar Fecha de Aniversario</h3>
+      <form id="form-update-anniversary">
+        <div class="form-group">
+          <label class="form-label" for="edit-anniversary-date">Nueva Fecha y Hora de Inicio</label>
+          <input type="datetime-local" id="edit-anniversary-date" class="form-input" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Guardar Nueva Fecha</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
