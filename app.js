@@ -77,6 +77,32 @@ const state = {
     player: { x: 200, y: 130, speed: 12 },
     items: [],
     animId: null
+  },
+
+  // Arcade: Partida multijugador 1v1 en tiempo real (RPS, Ajedrez, Damas)
+  arcade: {
+    matchId: null,
+    gameType: null,
+    player1Id: null,
+    player2Id: null,
+    winnerId: null,
+    myRole: 'player_1',
+    isMyTurn: false,
+    channel: null,
+    scores: { p1: 0, p2: 0 },
+    boardState: {},
+    status: null,
+    rev: 0,
+    waiting: false,
+    finished: false,
+    rpsChoice: null,
+    rpsRevealTimer: null,
+    triviaChannel: null,
+    triviaRoundId: null,
+    triviaPlayer1Id: null,
+    triviaPlayer2Id: null,
+    triviaResults: {},
+    cleanupInterval: null
   }
 };
 
@@ -192,6 +218,10 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabId));
   document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.toggle('hidden', pane.id !== tabId));
   if (tabId === 'tab-story') updateStoryStats();
+  // Al abrir Arcade, si aún no hay partida activa, conecta automáticamente a RPS
+  if (tabId === 'tab-arcade' && state.currentUser && state.currentSpace && !state.arcade.matchId) {
+    startArcadeGame('rps');
+  }
 }
 
 function switchView(viewName) {
@@ -255,6 +285,12 @@ async function handleAuthSubmit(e) {
 async function handleSignOut() {
   await supabase.auth.signOut();
   if (state.realtimeChannel) supabase.removeChannel(state.realtimeChannel);
+  leaveArcadeChannel();
+  if (state.arcade.triviaChannel) supabase.removeChannel(state.arcade.triviaChannel);
+  if (state.arcade.cleanupInterval) clearInterval(state.arcade.cleanupInterval);
+  state.arcade.cleanupInterval = null;
+  state.arcade.matchId = null;
+  state.arcade.triviaRoundId = null;
   state.currentUser = null;
   state.currentProfile = null;
   state.currentSpace = null;
@@ -385,6 +421,7 @@ async function initAppState(user) {
 
   initArcadeSystems();
   setupRealtime(space.id);
+  setupArcadeCleanup();
 }
 
 function updateHeaderUI() {
@@ -658,21 +695,34 @@ function initArcadeSystems() {
   document.querySelectorAll('.arcade-chip').forEach(chip => {
     chip.addEventListener('click', (e) => {
       document.querySelectorAll('.arcade-chip').forEach(c => c.classList.remove('active'));
-      e.target.classList.add('active');
-      const g = e.target.dataset.game;
-      ['ttt', 'checkers', 'chess', 'trivia', 'vor', 'tnt', 'coop'].forEach(id => {
+      e.currentTarget.classList.add('active');
+      const g = e.currentTarget.dataset.game;
+      const gameCards = ['rps', 'ttt', 'checkers', 'chess', 'trivia', 'vor', 'tnt', 'coop'];
+      gameCards.forEach(id => {
         document.getElementById(`game-${id}`)?.classList.toggle('hidden', id !== g);
       });
-      if (g === 'checkers') initCheckers();
-      if (g === 'chess') initChess();
+
+      // Juegos 1v1 online: RPS, Ajedrez y Damas -> matchmaking + tiempo real
+      if (g === 'rps' || g === 'checkers' || g === 'chess') {
+        startArcadeGame(g);
+      } else if (g === 'ttt') {
+        buildTttBoard();
+      }
     });
+  });
+
+  // Acciones de la partida 1v1
+  document.getElementById('btn-chess-reset')?.addEventListener('click', requestNextRound);
+  document.getElementById('btn-checkers-reset')?.addEventListener('click', requestNextRound);
+  document.getElementById('btn-arcade-cancel-wait')?.addEventListener('click', cancelArcadeWaiting);
+
+  // Botones de Piedra, Papel o Tijera
+  document.querySelectorAll('.rps-hand-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleRpsChoice(btn.dataset.choice));
   });
 
   // Reinicio global
   document.getElementById('btn-reset-global-score')?.addEventListener('click', resetGlobalScore);
-
-  // Mini RPS
-  initRps();
 
   // 3 en Raya adaptable (3x3 a 8x8)
   initDynamicTtt();
@@ -691,36 +741,327 @@ function initArcadeSystems() {
 }
 
 // ------------------------------------------------------------------------------
-// PIEDRA, PAPEL O TIJERA (SORTEAR QUIÉN INICIA)
+// ARCADE 1v1: HELPERS DE NOMBRES Y COLORES
 // ------------------------------------------------------------------------------
-function initRps() {
-  const choices = ['piedra', 'papel', 'tijera'];
-  const emojis = { piedra: '✊', papel: '✋', tijera: '✌️' };
-  document.querySelectorAll('.rps-hand-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const myChoice = btn.dataset.choice;
-      const partnerChoice = choices[Math.floor(Math.random() * choices.length)];
-      const resEl = document.getElementById('rps-result');
-      const myName = state.currentProfile?.alias || 'Tú';
-      const partnerName = state.partnerProfile?.alias || 'Tu Pareja';
+function arcadeMyName() {
+  return state.currentProfile?.alias || state.currentProfile?.username || 'Tú';
+}
+function arcadePartnerName() {
+  return state.partnerProfile?.alias || state.partnerProfile?.username || 'Tu Pareja';
+}
+function arcadeMyColor() {
+  // Ajedrez: player_1 siempre juega Blancas
+  return state.arcade.myRole === 'player_1' ? 'white' : 'black';
+}
+function arcadeMyRedColor() {
+  // Damas: player_1 siempre juega rojo/Corazones ❤️
+  return state.arcade.myRole === 'player_1' ? 'red' : 'black';
+}
+function deepCopyMatrix(m) {
+  return (m || []).map(row => (Array.isArray(row) ? row.slice() : row));
+}
 
-      if (myChoice === partnerChoice) {
-        resEl.innerText = `Empate (${emojis[myChoice]} vs ${emojis[partnerChoice]}). ¡Tira de nuevo!`;
-      } else if (
-        (myChoice === 'piedra' && partnerChoice === 'tijera') ||
-        (myChoice === 'papel' && partnerChoice === 'piedra') ||
-        (myChoice === 'tijera' && partnerChoice === 'papel')
-      ) {
-        resEl.innerText = `🎉 ¡Ganaste tú (${emojis[myChoice]} vs ${emojis[partnerChoice]})! Inicia ${myName}.`;
-        state.ttt.turn = 'P1';
-        updateTttTurnLabel();
-      } else {
-        resEl.innerText = `🌟 ¡Ganó ${partnerName} (${emojis[partnerChoice]} vs ${emojis[myChoice]})! Inicia ${partnerName}.`;
-        state.ttt.turn = 'P2';
-        updateTttTurnLabel();
+function updateSessionScore(gameType) {
+  const s = state.arcade.scores;
+  const el = document.getElementById(`${gameType}-session-score`);
+  if (el) el.innerText = `${arcadeMyName()}  ${s.p1}  -  ${s.p2}  ${arcadePartnerName()}`;
+}
+
+// ------------------------------------------------------------------------------
+// ARCADE 1v1: MATCHMAKING + REALTIME (enlace de sala / room_id)
+// ------------------------------------------------------------------------------
+async function startArcadeGame(gameType) {
+  if (!state.currentUser?.id || !state.currentSpace) {
+    showToast('Inicia sesión y vincula tu espacio para jugar en línea', 'error');
+    return;
+  }
+
+  leaveArcadeChannel();
+  state.arcade.finished = false;
+  state.arcade.rpsChoice = null;
+  state.arcade.rev = 0;
+  const modeLabel = { rps: 'Piedra, Papel o Tijera', chess: 'Ajedrez', checkers: 'Damas' }[gameType] || gameType;
+  updateSessionScore(gameType);
+
+  const { data, error } = await supabase.rpc('arcade_find_or_create', { p_game_type: gameType });
+  if (error || !data) {
+    showToast(error?.message || 'Error al buscar o crear la sala', 'error');
+    return;
+  }
+
+  state.arcade.matchId = data.match_id;
+  applyMatchRow(data);
+  subscribeArcadeMatch(data.match_id);
+
+  // Mostrar overlay de espera solo si no inició todavía
+  showArcadeWaiting(state.arcade.status === 'waiting', gameType);
+  if (state.arcade.status === 'in_progress') {
+    showToast(`Partida de ${modeLabel} conectada 🤝`, 'info');
+  }
+}
+
+function applyMatchRow(row) {
+  const a = state.arcade;
+  a.matchId = row.match_id;
+  a.gameType = row.game_type;
+  a.player1Id = row.player_1_id;
+  a.player2Id = row.player_2_id;
+  a.winnerId = row.winner_id || null;
+  a.myRole = row.player_1_id === state.currentUser.id ? 'player_1' : 'player_2';
+  a.scores = {
+    p1: (row.scores && row.scores.p1) || 0,
+    p2: (row.scores && row.scores.p2) || 0
+  };
+  a.boardState = row.board_state || {};
+  a.status = row.status;
+  a.rev = row.rev || 0;
+  a.isMyTurn = !!row.current_turn && row.current_turn === state.currentUser.id;
+  a.finished = row.status === 'finished';
+
+  if (row.game_type === 'chess') {
+    state.chess.myColor = arcadeMyColor();
+    state.chess.turn = a.isMyTurn ? arcadeMyColor() : (arcadeMyColor() === 'white' ? 'black' : 'white');
+    state.chess.board = deepCopyMatrix(a.boardState.board || createChessBoard());
+    state.chess.selected = null;
+    state.chess.validMoves = [];
+    state.chess.active = !a.finished;
+    renderChess();
+  } else if (row.game_type === 'checkers') {
+    state.checkers.myColor = arcadeMyRedColor();
+    state.checkers.turn = a.isMyTurn ? arcadeMyRedColor() : (arcadeMyRedColor() === 'red' ? 'black' : 'red');
+    state.checkers.board = deepCopyMatrix(a.boardState.board || createCheckersBoard());
+    state.checkers.selected = null;
+    state.checkers.validMoves = [];
+    state.checkers.active = !a.finished;
+    renderCheckers();
+  } else if (row.game_type === 'rps') {
+    state.arcade.rpsChoice = null;
+    renderRps();
+  }
+
+  updateArcadeMatchUI();
+}
+
+function handleArcadeMatchEvent(row) {
+  const a = state.arcade;
+  if (!row || row.id !== a.matchId) return;
+  const wasWaiting = a.status === 'waiting';
+  const wasFinished = a.finished;
+
+  applyMatchRow(row);
+
+  if (wasWaiting && a.status === 'in_progress') {
+    showArcadeWaiting(false);
+    const modeLabel = { rps: 'Piedra, Papel o Tijera', chess: 'Ajedrez', checkers: 'Damas' }[a.gameType] || '';
+    showToast(`🎉 ¡Tu pareja se unió! Comienza ${modeLabel}`, 'success');
+  }
+
+  // Cuando una ronda de Ajedrez/Damas termina (viene del oponente)
+  if (wasFinished !== a.finished && a.finished) {
+    showToast(arcadeFinishText(), a.winnerId === state.currentUser.id ? 'success' : 'info');
+  }
+}
+
+function subscribeArcadeMatch(matchId) {
+  if (!matchId) return;
+  leaveArcadeChannel();
+
+  state.arcade.channel = supabase
+    .channel(`arcade-match-${matchId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'arcade_matches',
+      filter: `id=eq.${matchId}`
+    }, (payload) => {
+      if (payload.new && (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT')) {
+        handleArcadeMatchEvent(payload.new);
+      }
+    })
+    .subscribe((status) => {
+      // Hidratar por si se perdieron eventos mientras no había suscripción
+      if (status === 'SUBSCRIBED') {
+        supabase.from('arcade_matches')
+          .select('*')
+          .eq('id', matchId)
+          .single()
+          .then(({ data }) => { if (data) handleArcadeMatchEvent(data); })
+          .catch(() => {});
       }
     });
+}
+
+function leaveArcadeChannel() {
+  if (state.arcade.channel) {
+    supabase.removeChannel(state.arcade.channel);
+    state.arcade.channel = null;
+  }
+}
+
+function showArcadeWaiting(show, gameType) {
+  const overlay = document.getElementById('arcade-waiting-overlay');
+  if (!overlay) return;
+  state.arcade.waiting = show;
+  overlay.classList.toggle('hidden', !show);
+  if (show) {
+    const partnerEl = document.getElementById('arcade-waiting-partner');
+    if (partnerEl) partnerEl.innerText = arcadePartnerName();
+  }
+}
+
+async function cancelArcadeWaiting() {
+  const a = state.arcade;
+  if (a.matchId) {
+    await supabase.rpc('arcade_cancel_waiting', { p_match_id: a.matchId }).catch(() => {});
+  }
+  leaveArcadeChannel();
+  state.arcade.matchId = null;
+  state.arcade.status = null;
+  showArcadeWaiting(false);
+  showToast('Sala cancelada', 'info');
+}
+
+async function requestNextRound() {
+  const a = state.arcade;
+  if (!a.matchId) return;
+  if (a.status === 'in_progress' && !a.finished && a.gameType !== 'rps') {
+    if (!confirm('¿Reiniciar la ronda en curso? Los movimientos actuales se descartarán.')) return;
+  }
+  const { error } = await supabase.rpc('arcade_next_round', { p_match_id: a.matchId });
+  if (error) showToast(error.message || 'No se pudo iniciar la siguiente ronda', 'error');
+}
+
+function arcadeFinishText() {
+  const a = state.arcade;
+  if (!a.winnerId) return '🤝 ¡Empate en esta ronda!';
+  if (a.winnerId === state.currentUser.id) return '🏆 ¡Ganaste esta ronda! (+1 al marcador)';
+  return `🌟 Ganó ${arcadePartnerName()} esta ronda`;
+}
+
+function updateArcadeMatchUI() {
+  const a = state.arcade;
+  if (!a.gameType) return;
+  updateSessionScore(a.gameType);
+
+  const bannerId = a.gameType === 'chess' ? 'chess-finished-banner' : (a.gameType === 'checkers' ? 'checkers-finished-banner' : null);
+  if (bannerId) {
+    const banner = document.getElementById(bannerId);
+    if (banner) {
+      banner.classList.toggle('hidden', a.status !== 'finished');
+      if (a.status === 'finished') banner.innerText = arcadeFinishText();
+    }
+  }
+}
+
+function setupArcadeCleanup() {
+  if (state.arcade.cleanupInterval) clearInterval(state.arcade.cleanupInterval);
+  // Ejecuta la limpieza de partidas viejas cada 15 minutos (respaldo del cron SQL)
+  state.arcade.cleanupInterval = setInterval(() => {
+    supabase.rpc('arcade_cleanup_old_matches').catch(() => {});
+    supabase.rpc('trivia_cleanup_old_rounds').catch(() => {});
+  }, 15 * 60 * 1000);
+}
+
+// ------------------------------------------------------------------------------
+// PIEDRA, PAPEL O TIJERA (MULTIJUGADOR ONLINE - SELECCIÓN CIEGA SIMULTÁNEA)
+// ------------------------------------------------------------------------------
+const RPS_EMOJIS = { piedra: '✊', papel: '✋', tijera: '✌️' };
+
+function handleRpsChoice(choice) {
+  const a = state.arcade;
+  if (a.status !== 'in_progress') {
+    showToast('La partida aún no ha comenzado', 'info');
+    return;
+  }
+  if (a.rpsChoice || a.boardState.last_result) return; // ya elegiste o se está revelando
+
+  supabase.rpc('arcade_rps_choose', { p_match_id: a.matchId, p_choice: choice })
+    .then(({ error }) => {
+      if (error) {
+        // Probablemente ya se envió (evento en camino) o la ronda se reinició
+        if (error.message && !error.message.includes('Ya has elegido')) {
+          showToast(error.message || 'No se pudo enviar tu jugada', 'error');
+        }
+        return;
+      }
+      a.rpsChoice = choice;
+      renderRps();
+    });
+}
+
+function renderRps() {
+  const a = state.arcade;
+  const buttons = [...document.querySelectorAll('.rps-hand-btn')];
+  const resultEl = document.getElementById('rps-result');
+  const myEmojiEl = document.getElementById('rps-my-emoji');
+  const partnerEmojiEl = document.getElementById('rps-partner-emoji');
+  const myCard = document.getElementById('rps-my-card');
+  const partnerCard = document.getElementById('rps-partner-card');
+  const myNameEl = document.getElementById('rps-my-name');
+  const partnerNameEl = document.getElementById('rps-partner-name');
+
+  if (!resultEl || !myEmojiEl) return;
+  myNameEl.innerText = arcadeMyName();
+  partnerNameEl.innerText = arcadePartnerName();
+  updateSessionScore('rps');
+
+  const bs = a.boardState || {};
+
+  const showReveal = (lr) => {
+    const myChoice = a.myRole === 'player_1' ? lr.p1_choice : lr.p2_choice;
+    const partnerChoice = a.myRole === 'player_1' ? lr.p2_choice : lr.p1_choice;
+
+    myEmojiEl.innerText = RPS_EMOJIS[myChoice] || '❓';
+    partnerEmojiEl.innerText = RPS_EMOJIS[partnerChoice] || '❓';
+    myCard.classList.add('revealed');
+    partnerCard.classList.add('revealed');
+    buttons.forEach(b => { b.disabled = true; b.classList.remove('picked'); });
+
+    const iWon = (lr.winner === 'p1' && a.myRole === 'player_1') ||
+                 (lr.winner === 'p2' && a.myRole === 'player_2');
+    if (lr.winner === 'draw') {
+      resultEl.innerText = `🤝 ¡Empate! (${RPS_EMOJIS[lr.p1_choice]} vs ${RPS_EMOJIS[lr.p2_choice]})`;
+    } else if (iWon) {
+      resultEl.innerText = `🎉 ¡Ganaste esta ronda! (+1 al marcador)`;
+    } else {
+      resultEl.innerText = `🌟 Ganó ${arcadePartnerName()} esta ronda`;
+    }
+
+    if (a.rpsRevealTimer) clearTimeout(a.rpsRevealTimer);
+    // Tras el reveal, dejar la mesa lista para la siguiente ronda
+    a.rpsRevealTimer = setTimeout(() => {
+      a.boardState.last_result = null;
+      a.rpsChoice = null;
+      myEmojiEl.innerText = '❓';
+      partnerEmojiEl.innerText = '❓';
+      myCard.classList.remove('revealed');
+      partnerCard.classList.remove('revealed');
+      resultEl.innerText = 'Haz clic en tu jugada para comenzar la ronda';
+      buttons.forEach(b => { b.disabled = false; b.classList.remove('picked'); });
+    }, 1800);
+  };
+
+  // Revelación pendiente: mostrar ambas elecciones al mismo tiempo
+  if (bs.last_result) {
+    showReveal(bs.last_result);
+    return;
+  }
+
+  // Ronda en curso: cada quien elige en secreto
+  buttons.forEach(b => {
+    b.disabled = false;
+    b.classList.toggle('picked', a.rpsChoice === b.dataset.choice);
   });
+
+  const partnerSlot = a.myRole === 'player_1' ? 'p2' : 'p1';
+  if (a.rpsChoice) {
+    myEmojiEl.innerText = '🤔';
+    resultEl.innerText = 'Jugada enviada. Esperando a tu pareja...';
+  } else {
+    myEmojiEl.innerText = '❓';
+    resultEl.innerText = 'Haz clic en tu jugada para comenzar la ronda';
+  }
+  partnerEmojiEl.innerText = bs[partnerSlot] ? '🤔' : '❓';
 }
 
 // ------------------------------------------------------------------------------
@@ -819,38 +1160,41 @@ function checkDynamicTttWinner() {
 }
 
 // ------------------------------------------------------------------------------
-// DAMAS (CHECKERS) PARA 2 JUGADORES
+// DAMAS (CHECKERS) MULTIJUGADOR ONLINE
 // ------------------------------------------------------------------------------
-function initCheckers() {
-  const container = document.getElementById('checkers-board-container');
-  if (!container) return;
-  document.getElementById('btn-checkers-reset')?.addEventListener('click', initCheckers);
-
-  // Tablero 8x8: r = roja/❤️, b = negra/⭐, R = dama roja, B = dama negra
-  state.checkers.board = Array(8).fill(null).map(() => Array(8).fill(null));
+function createCheckersBoard() {
+  const board = Array(8).fill(null).map(() => Array(8).fill(null));
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 8; c++) {
-      if ((r + c) % 2 === 1) state.checkers.board[r][c] = 'b';
+      if ((r + c) % 2 === 1) board[r][c] = 'b';
     }
   }
   for (let r = 5; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
-      if ((r + c) % 2 === 1) state.checkers.board[r][c] = 'r';
+      if ((r + c) % 2 === 1) board[r][c] = 'r';
     }
   }
-  state.checkers.turn = 'red';
-  state.checkers.selected = null;
-  state.checkers.validMoves = [];
-  state.checkers.active = true;
-  renderCheckers();
+  return board;
 }
 
 function renderCheckers() {
   const container = document.getElementById('checkers-board-container');
+  if (!container) return;
   container.innerHTML = '';
-  const myName = state.currentProfile?.alias || 'Tú';
-  const partnerName = state.partnerProfile?.alias || 'Tu Pareja';
-  document.getElementById('checkers-turn-label').innerText = `Turno de: ${state.checkers.turn === 'red' ? `❤️ ${myName}` : `⭐ ${partnerName}`}`;
+
+  const a = state.arcade;
+  const label = document.getElementById('checkers-turn-label');
+
+  if (a.finished) {
+    label.innerText = '🏁 Ronda terminada';
+  } else if (!a.isMyTurn) {
+    label.innerText = `⏳ Turno de ${arcadePartnerName()}`;
+  } else {
+    const colorName = state.checkers.myColor === 'red' ? 'Corazones ❤️' : 'Estrellas ⭐';
+    label.innerText = `👉 Tu turno (${colorName})`;
+  }
+
+  container.classList.toggle('board-locked', !a.isMyTurn || a.finished);
 
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
@@ -859,18 +1203,16 @@ function renderCheckers() {
       if (state.checkers.selected && state.checkers.selected.r === r && state.checkers.selected.c === c) {
         cell.classList.add('selected');
       }
-
       const isValid = state.checkers.validMoves.some(m => m.r === r && m.c === c);
       if (isValid) cell.classList.add('valid-move');
 
-      const piece = state.checkers.board[r][c];
+      const piece = state.checkers.board?.[r]?.[c];
       if (piece) {
         if (piece === 'r') cell.innerText = '❤️';
         else if (piece === 'R') cell.innerText = '👑';
         else if (piece === 'b') cell.innerText = '⭐';
         else if (piece === 'B') cell.innerText = '💎';
       }
-
       cell.addEventListener('click', () => handleCheckersClick(r, c));
       container.appendChild(cell);
     }
@@ -878,10 +1220,11 @@ function renderCheckers() {
 }
 
 function handleCheckersClick(r, c) {
-  if (!state.checkers.active) return;
+  const a = state.arcade;
+  if (!state.checkers.active || a.finished || !a.isMyTurn) return;
   const piece = state.checkers.board[r][c];
 
-  // Si hace clic en un movimiento válido
+  // Si hace clic en un movimiento válido (incluye saltos/capturas)
   const move = state.checkers.validMoves.find(m => m.r === r && m.c === c);
   if (move && state.checkers.selected) {
     const { r: fromR, c: fromC } = state.checkers.selected;
@@ -890,30 +1233,49 @@ function handleCheckersClick(r, c) {
     state.checkers.board[fromR][fromC] = null;
     state.checkers.board[r][c] = movingPiece;
 
-    // Si capturó pieza
+    // Captura (salto sobre ficha rival)
     if (move.captured) {
       state.checkers.board[move.captured.r][move.captured.c] = null;
     }
 
-    // Coronación
+    // Coronación de reina
     if (movingPiece === 'r' && r === 0) state.checkers.board[r][c] = 'R';
     if (movingPiece === 'b' && r === 7) state.checkers.board[r][c] = 'B';
 
     state.checkers.selected = null;
     state.checkers.validMoves = [];
-    state.checkers.turn = state.checkers.turn === 'red' ? 'black' : 'red';
 
-    // Comprobar ganador
-    checkCheckersWinner();
+    // ¿Terminó la ronda con esta jugada?
+    const winnerRole = checkCheckersWinner();
+    if (winnerRole) {
+      state.checkers.active = false;
+      showToast('🏆 ¡Ronda terminada! Sincronizando resultado...', 'success');
+    }
+    submitCheckersMove(winnerRole);
     renderCheckers();
     return;
   }
 
-  // Seleccionar ficha propia
-  if (piece && ((state.checkers.turn === 'red' && piece.toLowerCase() === 'r') || (state.checkers.turn === 'black' && piece.toLowerCase() === 'b'))) {
+  // Seleccionar ficha propia (solo en tu turno)
+  if (piece && ((state.checkers.myColor === 'red' && piece.toLowerCase() === 'r') ||
+                (state.checkers.myColor === 'black' && piece.toLowerCase() === 'b'))) {
     state.checkers.selected = { r, c };
     state.checkers.validMoves = getCheckersMoves(r, c, piece);
     renderCheckers();
+  }
+}
+
+async function submitCheckersMove(winnerRole) {
+  const a = state.arcade;
+  const payload = { board: deepCopyMatrix(state.checkers.board) };
+  if (winnerRole) payload.result = winnerRole;
+  const { error } = await supabase.rpc('arcade_turn_move', {
+    p_match_id: a.matchId,
+    p_board: payload,
+    p_rev: a.rev
+  });
+  if (error) {
+    showToast(error.message || 'No se pudo enviar tu jugada', 'error');
   }
 }
 
@@ -946,46 +1308,48 @@ function checkCheckersWinner() {
     if (p?.toLowerCase() === 'r') hasRed = true;
     if (p?.toLowerCase() === 'b') hasBlack = true;
   });
-
-  if (!hasRed) {
-    state.checkers.active = false;
-    showToast('🏆 ¡Ganaron las Estrellas!', 'success');
-    addGlobalWin('P2');
-  } else if (!hasBlack) {
-    state.checkers.active = false;
-    showToast('🏆 ¡Ganaron los Corazones!', 'success');
-    addGlobalWin('P1');
-  }
+  if (!hasRed) return 'p2';     // Estrellas ⭐ (player_2)
+  if (!hasBlack) return 'p1';   // Corazones ❤️ (player_1)
+  return null;
 }
 
 // ------------------------------------------------------------------------------
-// AJEDREZ (CHESS) PARA DOS JUGADORES
+// AJEDREZ (CHESS) MULTIJUGADOR ONLINE
 // ------------------------------------------------------------------------------
 const CHESS_PIECES = {
   wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙',
   bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟'
 };
 
-function initChess() {
-  document.getElementById('btn-chess-reset')?.addEventListener('click', initChess);
-  state.chess.board = [
+function createChessBoard() {
+  return [
     ['bR','bN','bB','bQ','bK','bB','bN','bR'],
     ['bP','bP','bP','bP','bP','bP','bP','bP'],
     Array(8).fill(null), Array(8).fill(null), Array(8).fill(null), Array(8).fill(null),
     ['wP','wP','wP','wP','wP','wP','wP','wP'],
     ['wR','wN','wB','wQ','wK','wB','wN','wR']
   ];
-  state.chess.turn = 'white';
-  state.chess.selected = null;
-  state.chess.validMoves = [];
-  state.chess.active = true;
-  renderChess();
 }
 
 function renderChess() {
   const container = document.getElementById('chess-board-container');
+  if (!container) return;
   container.innerHTML = '';
-  document.getElementById('chess-turn-label').innerText = `Turno de: ${state.chess.turn === 'white' ? '⚪ Blancas' : '⚫ Negras'}`;
+
+  const a = state.arcade;
+  const label = document.getElementById('chess-turn-label');
+
+  if (a.finished) {
+    label.innerText = '🏁 Ronda terminada';
+  } else if (!a.isMyTurn) {
+    label.innerText = `⏳ Turno de ${arcadePartnerName()}`;
+  } else {
+    const colorName = state.chess.myColor === 'white' ? 'Blancas ⚪' : 'Negras ⚫';
+    label.innerText = `👉 Tu turno (${colorName})`;
+  }
+
+  // Bloquea la interfaz completa de quien no tiene el turno
+  container.classList.toggle('board-locked', !a.isMyTurn || a.finished);
 
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
@@ -994,8 +1358,12 @@ function renderChess() {
       if (state.chess.selected?.r === r && state.chess.selected?.c === c) cell.classList.add('selected');
       if (state.chess.validMoves.some(m => m.r === r && m.c === c)) cell.classList.add('valid-move');
 
-      const p = state.chess.board[r][c];
-      if (p) cell.innerText = CHESS_PIECES[p] || '';
+      // Piezas con color sólido e inconfundible (#FFFFFF vs #1A1A1A)
+      const p = state.chess.board?.[r]?.[c];
+      if (p) {
+        const tone = p[0] === 'w' ? 'white' : 'black';
+        cell.innerHTML = `<span class="chess-piece ${tone}">${CHESS_PIECES[p] || ''}</span>`;
+      }
 
       cell.addEventListener('click', () => handleChessClick(r, c));
       container.appendChild(cell);
@@ -1004,37 +1372,60 @@ function renderChess() {
 }
 
 function handleChessClick(r, c) {
-  if (!state.chess.active) return;
+  const a = state.arcade;
+  if (!state.chess.active || a.finished || !a.isMyTurn) return;
   const p = state.chess.board[r][c];
   const isMove = state.chess.validMoves.some(m => m.r === r && m.c === c);
 
   if (isMove && state.chess.selected) {
     const { r: fr, c: fc } = state.chess.selected;
+    const movingPiece = state.chess.board[fr][fc];
     const targetPiece = state.chess.board[r][c];
-    state.chess.board[r][c] = state.chess.board[fr][fc];
-    state.chess.board[fr][fc] = null;
 
-    if (targetPiece === 'bK') {
-      showToast('🏆 ¡Jaque Mate! Ganan las Blancas ❤️', 'success');
-      addGlobalWin('P1');
-      state.chess.active = false;
-    } else if (targetPiece === 'wK') {
-      showToast('🏆 ¡Jaque Mate! Ganan las Negras ⭐', 'success');
-      addGlobalWin('P2');
-      state.chess.active = false;
-    }
+    // Detecta jaque mate (captura del rey) como victoria de la ronda
+    let winnerRole = null;
+    if (targetPiece === 'bK') winnerRole = 'p1';
+    else if (targetPiece === 'wK') winnerRole = 'p2';
+
+    state.chess.board[r][c] = movingPiece;
+    state.chess.board[fr][fc] = null;
 
     state.chess.selected = null;
     state.chess.validMoves = [];
-    state.chess.turn = state.chess.turn === 'white' ? 'black' : 'white';
+
+    if (winnerRole) {
+      state.chess.active = false;
+      showToast('🏆 ¡Jaque Mate! Sincronizando resultado...', 'success');
+    }
+    submitChessMove(fr, fc, r, c, winnerRole);
     renderChess();
     return;
   }
 
-  if (p && ((state.chess.turn === 'white' && p[0] === 'w') || (state.chess.turn === 'black' && p[0] === 'b'))) {
+  // Seleccionar pieza propia (solo en tu turno)
+  if (p && ((state.chess.myColor === 'white' && p[0] === 'w') ||
+            (state.chess.myColor === 'black' && p[0] === 'b'))) {
     state.chess.selected = { r, c };
     state.chess.validMoves = getBasicChessMoves(r, c, p);
     renderChess();
+  }
+}
+
+async function submitChessMove(fr, fc, tr, tc, winnerRole) {
+  const a = state.arcade;
+  const payload = {
+    board: deepCopyMatrix(state.chess.board),
+    from: [fr, fc],
+    to: [tr, tc]
+  };
+  if (winnerRole) payload.result = winnerRole;
+  const { error } = await supabase.rpc('arcade_turn_move', {
+    p_match_id: a.matchId,
+    p_board: payload,
+    p_rev: a.rev
+  });
+  if (error) {
+    showToast(error.message || 'No se pudo enviar tu jugada', 'error');
   }
 }
 
@@ -1159,6 +1550,9 @@ async function startTriviaQuiz() {
   document.getElementById('trivia-result-box').classList.add('hidden');
   document.getElementById('trivia-game-box').classList.remove('hidden');
 
+  // Abre/comparte la ronda con tu pareja para comparar aciertos al final
+  initializeTriviaRound();
+
   renderTriviaQuestion();
 }
 
@@ -1207,12 +1601,134 @@ async function nextTriviaQuestion() {
     document.getElementById('trivia-result-box').classList.remove('hidden');
     document.getElementById('trivia-final-score').innerText = `Aciertos: ${state.trivia.scoreP1} de ${state.trivia.totalQuestions}`;
 
-    if (state.trivia.scoreP1 >= Math.ceil(state.trivia.totalQuestions / 2)) {
-      addGlobalWin('P1');
-      showToast('🎉 ¡Gran ronda! Sumaron +1 al Marcador Global', 'success');
-    }
+    // Publica tus aciertos para compararlos en tiempo real con los de tu pareja
+    submitTriviaResult();
   } else {
     renderTriviaQuestion();
+  }
+}
+
+async function initializeTriviaRound() {
+  try {
+    const { data, error } = await supabase.rpc('trivia_begin_round');
+    if (error) throw error;
+    if (!data?.round_id) return;
+    state.arcade.triviaRoundId = data.round_id;
+    state.arcade.triviaPlayer1Id = data.player_1_id ?? null;
+    state.arcade.triviaPlayer2Id = data.player_2_id ?? null;
+    state.arcade.triviaResults = {};
+    subscribeTriviaResults();
+  } catch (err) {
+    showToast('No se pudo abrir la ronda de trivia', 'error');
+    console.error('trivia_begin_round', err);
+  }
+}
+
+function subscribeTriviaResults() {
+  const roundId = state.arcade.triviaRoundId;
+  if (!roundId) return;
+  if (state.arcade.triviaChannel) supabase.removeChannel(state.arcade.triviaChannel);
+
+  // Resultados ya publicados por tu pareja
+  supabase
+    .from('arcade_trivia_results')
+    .select('usuario_id, aciertos, total')
+    .eq('round_id', roundId)
+    .then(({ data, error }) => {
+      if (!error && data) data.forEach(r => updateTriviaResultCache(r));
+      renderTriviaCompare();
+    });
+
+  const channel = supabase
+    .channel(`trivia-round-${roundId}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'arcade_trivia_results',
+      filter: `round_id=eq.${roundId}`
+    }, payload => {
+      if (payload?.new) updateTriviaResultCache(payload.new);
+      renderTriviaCompare();
+    })
+    .subscribe();
+  state.arcade.triviaChannel = channel;
+}
+
+function updateTriviaResultCache(row) {
+  if (row?.usuario_id == null) return;
+  state.arcade.triviaResults[row.usuario_id] = {
+    aciertos: row.aciertos ?? 0,
+    total: row.total ?? state.trivia.totalQuestions
+  };
+}
+
+function triviaNameForUser(usuarioId) {
+  const a = state.arcade;
+  const myId = state.currentUser?.id;
+  if (usuarioId === a.triviaPlayer1Id) {
+    return a.triviaPlayer1Id === myId ? arcadeMyName() : arcadePartnerName();
+  }
+  if (usuarioId === a.triviaPlayer2Id) {
+    return a.triviaPlayer2Id === myId ? arcadeMyName() : arcadePartnerName();
+  }
+  return 'Tu Pareja';
+}
+
+function renderTriviaCompare() {
+  try {
+    const resultBox = document.getElementById('trivia-result-box');
+    const line = document.getElementById('trivia-compare-line');
+    const winnerBox = document.getElementById('trivia-compare-winner');
+    if (!resultBox || !line || !winnerBox) return;
+    if (resultBox.classList.contains('hidden')) return;
+
+    const results = Object.entries(state.arcade.triviaResults);
+    if (results.length === 0) {
+      line.innerText = state.arcade.triviaRoundId
+        ? 'Tu pareja también está jugando en su dispositivo. Sus aciertos aparecerán aquí en vivo.'
+        : 'Cada quien juega en su dispositivo y compara sus aciertos al terminar.';
+      winnerBox.style.display = 'none';
+      return;
+    }
+
+    const parts = results.map(([uid, r]) => `${triviaNameForUser(uid)}: ${r.aciertos}/${r.total}`);
+    line.innerText = `📊 ${parts.join('  •  ')}`;
+
+    if (results.length >= 2) {
+      const sorted = [...results].sort((x, y) => y[1].aciertos - x[1].aciertos);
+      const first = sorted[0], second = sorted[1];
+      let winnerText;
+      if (first[1].aciertos > second[1].aciertos) {
+        winnerText = `🏆 ¡Más aciertos: ${triviaNameForUser(first[0])}!`;
+      } else {
+        winnerText = '🤝 ¡Empate! Ambos se conocen igual de bien.';
+      }
+      winnerBox.innerText = winnerText;
+      winnerBox.style.display = 'block';
+    } else {
+      winnerBox.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('renderTriviaCompare', err);
+  }
+}
+
+async function submitTriviaResult() {
+  const roundId = state.arcade.triviaRoundId;
+  if (!roundId) return;
+  const myId = state.currentUser?.id;
+  if (myId) updateTriviaResultCache({ usuario_id: myId, aciertos: state.trivia.scoreP1, total: state.trivia.totalQuestions });
+  renderTriviaCompare();
+  try {
+    const { error } = await supabase.rpc('trivia_submit_result', {
+      p_round_id: roundId,
+      p_aciertos: state.trivia.scoreP1,
+      p_total: state.trivia.totalQuestions
+    });
+    if (error) throw error;
+  } catch (err) {
+    showToast('No se pudo publicar tu resultado', 'error');
+    console.error('trivia_submit_result', err);
   }
 }
 

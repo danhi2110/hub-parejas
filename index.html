@@ -257,7 +257,8 @@
 
         <!-- SELECTOR DE MINIJUEGOS -->
         <div class="arcade-menu-chips">
-          <button class="arcade-chip active" data-game="ttt">❌⭕ 3 en Raya (3x3 a 8x8)</button>
+          <button class="arcade-chip active" data-game="rps">✊✋✌️ Piedra, Papel o Tijera</button>
+          <button class="arcade-chip" data-game="ttt">❌⭕ 3 en Raya (3x3 a 8x8)</button>
           <button class="arcade-chip" data-game="checkers">🔴⚪ Damas</button>
           <button class="arcade-chip" data-game="chess">♟️ Ajedrez</button>
           <button class="arcade-chip" data-game="trivia">🧠 Trivia de Pareja</button>
@@ -266,21 +267,40 @@
           <button class="arcade-chip" data-game="coop">🤝 Misión Cooperativa</button>
         </div>
 
-        <!-- JUEGO 1: 3 EN RAYA (AMPLIABLE DE 3x3 HASTA 8x8) -->
-        <div id="game-ttt" class="game-card">
+        <!-- JUEGO 1: PIEDRA, PAPEL O TIJERA (MULTIJUGADOR ONLINE) -->
+        <div id="game-rps" class="game-card">
+          <h3 class="card-title">✊✋✌️ Piedra, Papel o Tijera</h3>
+          <p class="card-subtitle">Selección simultánea y oculta: ambos eligen y se revela al mismo tiempo.</p>
+
+          <div class="match-scoreboard">
+            <span class="match-score-title">Marcador de la sesión</span>
+            <span id="rps-session-score" class="match-score-value">0 - 0</span>
+          </div>
+
+          <div class="rps-arena">
+            <div class="rps-fighter-card" id="rps-my-card">
+              <div id="rps-my-emoji" class="rps-fighter-emoji">❓</div>
+              <div class="rps-fighter-name" id="rps-my-name">Tú</div>
+            </div>
+            <span class="rps-versus">VS</span>
+            <div class="rps-fighter-card" id="rps-partner-card">
+              <div id="rps-partner-emoji" class="rps-fighter-emoji">❓</div>
+              <div class="rps-fighter-name" id="rps-partner-name">Tu Pareja</div>
+            </div>
+          </div>
+
+          <div class="rps-btn-group">
+            <button class="rps-hand-btn" data-choice="piedra">✊</button>
+            <button class="rps-hand-btn" data-choice="papel">✋</button>
+            <button class="rps-hand-btn" data-choice="tijera">✌️</button>
+          </div>
+          <div id="rps-result" class="rps-result-line">Haz clic en tu jugada para comenzar la ronda</div>
+        </div>
+
+        <!-- JUEGO 2: 3 EN RAYA (AMPLIABLE DE 3x3 HASTA 8x8) -->
+        <div id="game-ttt" class="game-card hidden">
           <h3 class="card-title">❌⭕ 3 en Raya Romántico</h3>
           <p class="card-subtitle">Corazones (❤️) contra Estrellas (⭐)</p>
-
-          <!-- MINI JUEGO: PIEDRA, PAPEL O TIJERA PARA DECIDIR QUIÉN EMPIEZA -->
-          <div class="rps-box">
-            <div style="font-weight: 700; font-size: 0.88rem; margin-bottom: 0.3rem;">✊✋✌️ ¿Quién empieza? Juega Piedra, Papel o Tijera:</div>
-            <div class="rps-btn-group">
-              <button class="rps-hand-btn" data-choice="piedra">✊</button>
-              <button class="rps-hand-btn" data-choice="papel">✋</button>
-              <button class="rps-hand-btn" data-choice="tijera">✌️</button>
-            </div>
-            <div id="rps-result" style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-top: 0.4rem;">Haz clic en tu jugada para sortear el primer turno</div>
-          </div>
 
           <!-- Selector de tamaño (3x3 a 8x8) -->
           <div class="ttt-size-selector">
@@ -304,26 +324,44 @@
           <button id="btn-ttt-reset" class="btn btn-secondary btn-sm">Reiniciar Tablero</button>
         </div>
 
-        <!-- JUEGO 2: DAMAS (CHECKERS) -->
+        <!-- JUEGO 3: DAMAS (CHECKERS) -->
         <div id="game-checkers" class="game-card hidden">
           <h3 class="card-title">🔴⚪ Damas de Pareja</h3>
-          <p class="card-subtitle">❤️ Corazones vs ⭐ Estrellas (Salva tus piezas y corona damas con 👑)</p>
-          <div id="checkers-turn-label" style="font-weight: 800; color: var(--primary); margin-bottom: 0.5rem;">Turno de: ❤️ Corazones</div>
-          
+          <p class="card-subtitle">❤️ Corazones vs ⭐ Estrellas · Online en tiempo real contra tu pareja.</p>
+
+          <div class="match-scoreboard">
+            <span class="match-score-title">Marcador de la sesión</span>
+            <span id="checkers-session-score" class="match-score-value">0 - 0</span>
+          </div>
+
+          <div id="checkers-turn-label" class="arcade-turn-label">Turno de: ❤️ Corazones</div>
+          <div id="checkers-finished-banner" class="arcade-finished-banner hidden"></div>
+
           <div id="checkers-board-container" class="checkers-board"></div>
-          
-          <button id="btn-checkers-reset" class="btn btn-secondary btn-sm">Reiniciar Partida de Damas</button>
+
+          <div class="arcade-match-actions">
+            <button id="btn-checkers-reset" class="btn btn-secondary btn-sm">Siguiente Ronda</button>
+          </div>
         </div>
 
-        <!-- JUEGO 3: AJEDREZ (CHESS) -->
+        <!-- JUEGO 4: AJEDREZ (CHESS) -->
         <div id="game-chess" class="game-card hidden">
           <h3 class="card-title">♟️ Ajedrez para Dos</h3>
-          <p class="card-subtitle">Blancas (♔) vs Negras (♚). Toca una pieza para ver sus movimientos válidos.</p>
-          <div id="chess-turn-label" style="font-weight: 800; color: var(--primary); margin-bottom: 0.5rem;">Turno de: ⚪ Blancas</div>
+          <p class="card-subtitle">Blancas (⚪) vs Negras (⚫) · Online en tiempo real contra tu pareja.</p>
+
+          <div class="match-scoreboard">
+            <span class="match-score-title">Marcador de la sesión</span>
+            <span id="chess-session-score" class="match-score-value">0 - 0</span>
+          </div>
+
+          <div id="chess-turn-label" class="arcade-turn-label">Turno de: ⚪ Blancas</div>
+          <div id="chess-finished-banner" class="arcade-finished-banner hidden"></div>
 
           <div id="chess-board-container" class="chess-board"></div>
 
-          <button id="btn-chess-reset" class="btn btn-secondary btn-sm">Reiniciar Tablero de Ajedrez</button>
+          <div class="arcade-match-actions">
+            <button id="btn-chess-reset" class="btn btn-secondary btn-sm">Siguiente Ronda</button>
+          </div>
         </div>
 
         <!-- JUEGO 4: TRIVIA DE PAREJA PERSONALIZADA (5 a 20 preguntas) -->
@@ -365,7 +403,14 @@
           <div id="trivia-result-box" class="hidden" style="background: var(--primary-light); border-radius: 16px; padding: 2rem; max-width: 420px; margin: 0 auto;">
             <h4 style="font-size: 1.5rem; font-weight: 800; color: var(--primary);">🎉 ¡Trivia Completada!</h4>
             <div id="trivia-final-score" style="font-size: 1.1rem; font-weight: 700; margin: 1rem 0;">Aciertos: 0 / 5</div>
-            <button id="btn-restart-trivia-menu" class="btn btn-primary">Jugar Otra Trivia</button>
+
+            <div class="match-scoreboard" style="flex-direction: column; align-items: stretch; gap: 0.25rem;">
+              <span class="match-score-title">Comparación de la ronda</span>
+              <div id="trivia-compare-line" style="font-weight: 800; font-size: 0.95rem;">Cada quien juega en su dispositivo y compara sus aciertos al terminar.</div>
+              <div id="trivia-compare-winner" class="game-card" style="display: none; margin-top: 0.25rem; padding: 0.6rem 1rem; font-weight: 800; font-size: 0.95rem;"></div>
+            </div>
+
+            <button id="btn-restart-trivia-menu" class="btn btn-primary" style="margin-top: 1rem;">Jugar Otra Trivia</button>
           </div>
         </div>
 
@@ -451,6 +496,16 @@
           </div>
 
           <button id="btn-start-coop" class="btn btn-primary btn-sm" style="margin-top: 1rem;">Iniciar Partida Cooperativa</button>
+        </div>
+
+        <!-- OVERLAY: ESPERANDO A LA PAREJA (MATCHMAKING) -->
+        <div id="arcade-waiting-overlay" class="arcade-waiting-overlay hidden">
+          <div class="arcade-waiting-card">
+            <div class="arcade-spinner"></div>
+            <p class="waiting-title">Esperando a tu pareja...</p>
+            <p class="waiting-sub" id="arcade-waiting-text">Tu sala está lista. Comparte con <span id="arcade-waiting-partner"></span> para iniciar la partida.</p>
+            <button id="btn-arcade-cancel-wait" class="btn btn-secondary btn-sm">Cancelar Sala</button>
+          </div>
         </div>
 
       </div>
