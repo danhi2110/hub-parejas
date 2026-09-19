@@ -596,7 +596,14 @@ CREATE POLICY "Eliminar solo participantes" ON public.arcade_matches
 
 -- ==============================================================================
 -- 14. SUPABASE REALTIME (IDEMPOTENTE)
+-- ------------------------------------------------------------------------------
+-- Sin REPLICA IDENTITY FULL los UPDATE llegan por Realtime sin datos
+-- (payload.new nulo) y el cliente los ignora: ningún juego sincronizaría.
 -- ==============================================================================
+ALTER TABLE public.arcade_matches REPLICA IDENTITY FULL;
+ALTER TABLE public.arcade_trivia_rounds REPLICA IDENTITY FULL;
+ALTER TABLE public.arcade_trivia_results REPLICA IDENTITY FULL;
+
 DO $$
 BEGIN
     BEGIN

@@ -969,6 +969,11 @@ const RPS_EMOJIS = { piedra: '✊', papel: '✋', tijera: '✌️' };
 
 function handleRpsChoice(choice) {
   const a = state.arcade;
+  if (!a.matchId) {
+    showToast('Sin sala activa, reconectando...', 'info');
+    startArcadeGame('rps');
+    return;
+  }
   if (a.status !== 'in_progress') {
     showToast('La partida aún no ha comenzado', 'info');
     return;
@@ -1267,6 +1272,11 @@ function handleCheckersClick(r, c) {
 
 async function submitCheckersMove(winnerRole) {
   const a = state.arcade;
+  if (!a.matchId) {
+    showToast('Sin sala activa, reconectando...', 'info');
+    startArcadeGame('checkers');
+    return;
+  }
   const payload = { board: deepCopyMatrix(state.checkers.board) };
   if (winnerRole) payload.result = winnerRole;
   const { error } = await supabase.rpc('arcade_turn_move', {
@@ -1413,6 +1423,11 @@ function handleChessClick(r, c) {
 
 async function submitChessMove(fr, fc, tr, tc, winnerRole) {
   const a = state.arcade;
+  if (!a.matchId) {
+    showToast('Sin sala activa, reconectando...', 'info');
+    startArcadeGame('chess');
+    return;
+  }
   const payload = {
     board: deepCopyMatrix(state.chess.board),
     from: [fr, fc],
